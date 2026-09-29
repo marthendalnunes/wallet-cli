@@ -1,5 +1,7 @@
 name: Build
 
+permissions: {}
+
 on:
   push:
     tags:
@@ -267,7 +269,7 @@ jobs:
         run: rustup default stable
 
       - name: Build release signer
-        run: cargo build --release -p tempo-sign
+        run: cargo build --locked --release -p tempo-sign
         working-directory: wallet-release-tools
 
       - name: Sign release binaries
