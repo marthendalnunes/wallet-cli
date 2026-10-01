@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { createServer } from "node:http";
 import { promisify } from "node:util";
 import { Challenge, Credential } from "mppx";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 
 const exec = promisify(execFile);
 const servers: ReturnType<typeof createServer>[] = [];
@@ -103,6 +103,19 @@ it.each([
   expect(result.code).not.toBe(0);
   expect(`${result.stdout}${result.stderr}`).toContain(message);
   expect(server.counts()).toEqual({ requests: 1, authenticated: 0, rpc: 0 });
+});
+
+it("applies TEMPO_MAX_SPEND when --max-spend is omitted", async () => {
+  vi.stubEnv("TEMPO_MAX_SPEND", "0.001");
+  try {
+    const server = await fixture();
+    const result = await server.run();
+    expect(result.code).not.toBe(0);
+    expect(`${result.stdout}${result.stderr}`).toContain("max spend exceeded");
+    expect(server.counts()).toEqual({ requests: 1, authenticated: 0, rpc: 0 });
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });
 
 it("dry-run decodes and validates a quote without accessing the wallet", async () => {

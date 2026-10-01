@@ -10,7 +10,10 @@ const args = z.object({
 
 const options = z.object({
   "dry-run": z.boolean().optional().describe("Show payment challenge without paying"),
-  "max-spend": z.string().optional().describe("Hard cap for cumulative payment spend"),
+  "max-spend": z
+    .string()
+    .optional()
+    .describe("Hard cap for cumulative payment spend (or TEMPO_MAX_SPEND)"),
   "payment-intent": z
     .enum(["auto", "session", "charge"])
     .default("auto")
@@ -244,7 +247,7 @@ function describeRequestCli() {
         name: "max_spend",
         long: "--max-spend",
         value_name: "AMOUNT",
-        help: "Hard cap for cumulative payment spend",
+        help: "Hard cap for cumulative payment spend (or TEMPO_MAX_SPEND)",
       },
       {
         name: "payment_intent",

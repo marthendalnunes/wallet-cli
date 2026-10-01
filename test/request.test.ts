@@ -1133,6 +1133,21 @@ describe("request command", () => {
     );
   });
 
+  it("falls back to TEMPO_MAX_SPEND when --max-spend is omitted", () => {
+    try {
+      vi.stubEnv("TEMPO_MAX_SPEND", " 2.50 ");
+      expect(parseRequestArgs(["https://example.com"]).maxSpend).toBe("2.50");
+      expect(parseRequestArgs(["--max-spend", "1.00", "https://example.com"]).maxSpend).toBe(
+        "1.00",
+      );
+
+      vi.stubEnv("TEMPO_MAX_SPEND", "banana");
+      expect(() => parseRequestArgs(["https://example.com"])).toThrow("TEMPO_MAX_SPEND");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("recovers stale session locks left behind by killed request processes", async () => {
     const home = await useTempHome();
     const lockDir = join(home, ".tempo", "wallet", "session-locks");

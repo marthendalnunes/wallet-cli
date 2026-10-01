@@ -334,8 +334,11 @@ function validateRequestOptions(options: RequestOptions) {
   options.network = normalizeNetwork(
     options.network ?? process.env.TEMPO_WALLET_NETWORK ?? "mainnet",
   );
+  options.maxSpend ??= process.env.TEMPO_MAX_SPEND?.trim() || undefined;
   if (options.maxSpend !== undefined && !/^\d+(?:\.\d{1,6})?$/.test(options.maxSpend))
-    throw usageError("--max-spend must be a non-negative amount with at most 6 decimal places");
+    throw usageError(
+      "--max-spend (or TEMPO_MAX_SPEND) must be a non-negative amount with at most 6 decimal places",
+    );
   if (options.paymentToken !== undefined)
     options.paymentToken = paymentTokenValue(options.paymentToken);
   if (options.paymentIntent !== undefined) paymentIntentValue(options.paymentIntent);
