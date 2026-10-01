@@ -655,6 +655,33 @@ describe("request command", () => {
     expect(stdout.text()).toBe("target");
   });
 
+  it("strips credentials on cross-origin redirects and keeps them on same-origin ones", async () => {
+    const seen: Record<string, string | undefined> = {};
+    const other = await testServer((request, response) => {
+      seen.cross = request.headers.authorization;
+      response.end("other");
+    });
+    const server = await testServer((request, response) => {
+      if (request.url === "/target") {
+        seen.same = request.headers.authorization;
+        response.end("target");
+        return;
+      }
+      response.statusCode = 302;
+      response.setHeader("location", request.url === "/cross" ? other.url("/target") : "/target");
+      response.end();
+    });
+
+    await runRequest(["-L", "--bearer", "secret-token", server.url("/cross")], {
+      stdout: captureStdout(),
+    });
+    await runRequest(["-L", "--bearer", "secret-token", server.url("/same")], {
+      stdout: captureStdout(),
+    });
+
+    expect(seen).toEqual({ cross: undefined, same: "Bearer secret-token" });
+  });
+
   it("fails when the redirect limit is exceeded", async () => {
     const server = await testServer((_request, response) => {
       response.statusCode = 302;
