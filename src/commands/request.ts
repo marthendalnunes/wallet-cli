@@ -772,7 +772,7 @@ async function payAndRetryRequest(
 
     payment.onChallengeReceived(async ({ challenge, createCredential }) => {
       if (provider && providerState!.store.getState().accounts.length === 0)
-        await ensureProviderAccounts(provider);
+        await ensureProviderAccounts(provider, options.network);
       return await createCredential(paymentContext(challenge, options) as never);
     });
 
@@ -939,7 +939,7 @@ export async function resolvePaymentIdentity(options: RequestOptions) {
   const providerState = provider as unknown as {
     store: { getState(): { accounts: { address: string }[]; activeAccount: number } };
   };
-  await ensureProviderAccounts(provider);
+  await ensureProviderAccounts(provider, options.network);
   const getClient = ({ chainId: requestedChainId }: { chainId?: number | undefined }) => {
     const client = provider.getClient({ chainId: requestedChainId ?? chainId(options.network) });
     const state = providerState.store.getState();
@@ -968,10 +968,13 @@ export async function resolvePaymentIdentity(options: RequestOptions) {
   };
 }
 
-async function ensureProviderAccounts(provider: Parameters<typeof connect>[0]) {
+async function ensureProviderAccounts(
+  provider: Parameters<typeof connect>[0],
+  network: string | undefined,
+) {
   const accounts = (await provider.request({ method: "eth_accounts" })) as unknown[];
   if (accounts.length > 0) return;
-  await connect(provider);
+  await connect(provider, { network });
 }
 
 export async function storedAccessKeyIdentity(walletState: WalletState, options: RequestOptions) {

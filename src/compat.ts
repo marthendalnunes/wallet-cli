@@ -3,6 +3,7 @@ import { currentWhoamiOutput } from "./commands/identity.js";
 import { fundAction, runFundingFlow } from "./commands/fund.js";
 import { listSessions } from "./commands/sessions.js";
 import { usageError } from "./shared/errors.js";
+import { chainId } from "./shared/network.js";
 
 export async function handleCompatCommand(args: readonly string[]) {
   if (args[0] === "help") {
@@ -17,12 +18,14 @@ export async function handleCompatCommand(args: readonly string[]) {
   if (command === "login" && args.includes("--no-browser")) {
     const state = await loadWalletState();
     const activeAccount = state.accounts[state.activeAccount ?? 0];
-    if (!activeAccount) return false;
+    const network = stringArg(args, "--network") ?? stringArg(args, "-n");
+    if (!activeAccount || state.chainId !== chainId(network)) return false;
     printCompatOutput(
       await currentWhoamiOutput({
         walletAddress: activeAccount.address,
         chain: state.chainId ?? null,
         accessKeys: state.accessKeys,
+        network,
       }),
       args,
     );

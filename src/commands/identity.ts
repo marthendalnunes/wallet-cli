@@ -44,7 +44,7 @@ export async function loginHandler(options: {
 }) {
   const state = await loadWalletState();
   const activeAccount = state.accounts[state.activeAccount ?? 0];
-  if (activeAccount && walletStateMatchesNetwork(state, options.network))
+  if (activeAccount && state.chainId === chainId(options.network))
     return await currentWhoamiOutput({
       walletAddress: activeAccount.address,
       chain: state.chainId ?? null,
@@ -56,7 +56,7 @@ export async function loginHandler(options: {
     network: options.network,
     noBrowser: options.browser === false,
   });
-  const result = await connect(provider);
+  const result = await connect(provider, options);
 
   return {
     accounts: result.accounts.map((account) => account.address),
@@ -66,7 +66,7 @@ export async function loginHandler(options: {
 
 export async function refreshHandler(options: { network?: string | undefined }) {
   const provider = createProvider({ network: options.network });
-  const result = await connect(provider);
+  const result = await connect(provider, options);
 
   return {
     accounts: result.accounts.map((account) => account.address),
@@ -93,10 +93,7 @@ export async function whoamiHandler(options: {
   const state = await loadWalletState();
   const activeAccount = state.accounts[state.activeAccount ?? 0];
   const walletAddress = activeAccount?.address ?? null;
-  const chain = state.chainId ?? null;
-
-  if (!options.credits && !walletStateMatchesNetwork(state, options.network))
-    return { ready: false };
+  const chain = chainId(options.network);
 
   if (options.credits && !walletAddress)
     throw usageError("Configuration missing: No wallet configured. Run 'tempo wallet login'.");
