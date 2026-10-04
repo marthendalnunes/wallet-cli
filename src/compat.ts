@@ -4,6 +4,7 @@ import { fundAction, runFundingFlow } from "./commands/fund.js";
 import { listSessions } from "./commands/sessions.js";
 import { usageError } from "./shared/errors.js";
 import { chainId } from "./shared/network.js";
+import { selectPaymentCapableAccessKey } from "./wallet/access-key.js";
 
 export async function handleCompatCommand(args: readonly string[]) {
   if (args[0] === "help") {
@@ -19,7 +20,16 @@ export async function handleCompatCommand(args: readonly string[]) {
     const state = await loadWalletState();
     const activeAccount = state.accounts[state.activeAccount ?? 0];
     const network = stringArg(args, "--network") ?? stringArg(args, "-n");
-    if (!activeAccount || state.chainId !== chainId(network)) return false;
+    const selectedChainId = chainId(network);
+    if (
+      !activeAccount ||
+      state.chainId !== selectedChainId ||
+      !selectPaymentCapableAccessKey(state.accessKeys, {
+        chainId: selectedChainId,
+        walletAddress: activeAccount.address,
+      })
+    )
+      return false;
     printCompatOutput(
       await currentWhoamiOutput({
         walletAddress: activeAccount.address,

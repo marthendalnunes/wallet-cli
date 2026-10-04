@@ -44,7 +44,15 @@ export async function loginHandler(options: {
 }) {
   const state = await loadWalletState();
   const activeAccount = state.accounts[state.activeAccount ?? 0];
-  if (activeAccount && state.chainId === chainId(options.network))
+  const selectedChainId = chainId(options.network);
+  if (
+    activeAccount &&
+    state.chainId === selectedChainId &&
+    selectPaymentCapableAccessKey(state.accessKeys, {
+      chainId: selectedChainId,
+      walletAddress: activeAccount.address,
+    })
+  )
     return await currentWhoamiOutput({
       walletAddress: activeAccount.address,
       chain: state.chainId ?? null,
@@ -60,7 +68,7 @@ export async function loginHandler(options: {
 
   return {
     accounts: result.accounts.map((account) => account.address),
-    chainId: chainId(options.network),
+    chainId: selectedChainId,
   };
 }
 

@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
+import { createPublicClient, http } from "viem";
 
 const mocks = vi.hoisted(() => ({
   readContract: vi.fn(async () => 0n),
@@ -12,10 +13,14 @@ const mocks = vi.hoisted(() => ({
   ),
 }));
 
-vi.mock("viem", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("viem")>()),
-  createPublicClient: vi.fn(() => ({ readContract: mocks.readContract })),
-}));
+vi.mock("viem", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("viem")>();
+  return {
+    ...actual,
+    createPublicClient: vi.fn(() => ({ readContract: mocks.readContract })),
+    http: vi.fn(actual.http),
+  };
+});
 
 vi.mock("../src/provider.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/provider.js")>()),
@@ -29,6 +34,7 @@ import {
   testAccessKey2,
   testPrivateKey2,
   testWallet,
+  testWallet2,
   useTempHome,
   usdc,
   walletState,
@@ -39,6 +45,8 @@ afterEach(() => {
   vi.unstubAllEnvs();
   mocks.request.mockReset();
   mocks.readContract.mockClear();
+  vi.mocked(createPublicClient).mockClear();
+  vi.mocked(http).mockClear();
 });
 
 it.each([
@@ -74,8 +82,20 @@ it.each([
 });
 
 it.each([
-  { storedChain: 4217, network: "testnet", selectedChain: 42431, token: moderatoToken },
-  { storedChain: 42431, network: "mainnet", selectedChain: 4217, token: usdc },
+  {
+    storedChain: 4217,
+    network: "testnet",
+    selectedChain: 42431,
+    token: moderatoToken,
+    rpc: "https://rpc.moderato.tempo.xyz",
+  },
+  {
+    storedChain: 42431,
+    network: "mainnet",
+    selectedChain: 4217,
+    token: usdc,
+    rpc: "https://rpc.mainnet.tempo.xyz",
+  },
 ])("whoami selects $network independently of stored chain $storedChain", async (scenario) => {
   await useTempHome();
   vi.stubGlobal(
@@ -106,6 +126,10 @@ it.each([
   expect(mocks.readContract).toHaveBeenCalledWith(
     expect.objectContaining({ address: scenario.token }),
   );
+  expect(createPublicClient).toHaveBeenCalledWith(
+    expect.objectContaining({ chain: expect.objectContaining({ id: scenario.selectedChain }) }),
+  );
+  expect(http).toHaveBeenCalledWith(scenario.rpc, expect.objectContaining({ retryCount: 0 }));
   expect((await loadWalletState()).chainId).toBe(scenario.storedChain);
 });
 
@@ -123,4 +147,31 @@ it("whoami honors TEMPO_WALLET_NETWORK when no flag is supplied", async () => {
   );
 
   expect(await whoamiHandler({})).toMatchObject({ ready: true, key: { chain_id: 42431 } });
+});
+
+it.each([
+  { name: "expired", overrides: { expiry: 1 } },
+  { name: "missing signing material", overrides: { privateKey: undefined } },
+  { name: "another wallet", overrides: { access: testWallet2 } },
+])("login does not reuse a cached $name key", async ({ overrides }) => {
+  await useTempHome();
+  await saveWalletState(
+    walletState({ accessKeys: [{ ...walletState().accessKeys[0]!, ...overrides }] }),
+  );
+  mocks.request.mockResolvedValue({ accounts: [{ address: testWallet }] });
+
+  expect(await loginHandler({ network: "mainnet" })).toMatchObject({ chainId: 4217 });
+  expect(mocks.request).toHaveBeenCalledTimes(1);
+});
+
+it("login reuses a usable cached key without starting authorization", async () => {
+  await useTempHome();
+  await saveWalletState(walletState());
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("[]", { status: 200 })),
+  );
+
+  expect(await loginHandler({ network: "mainnet" })).toMatchObject({ ready: true });
+  expect(mocks.request).not.toHaveBeenCalled();
 });
