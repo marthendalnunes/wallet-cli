@@ -36,13 +36,31 @@ vi.mock("../src/shared/network.js", async (importOriginal) => ({
 }));
 
 import { loginHandler } from "../src/commands/identity.js";
+import { parseRequestArgs, resolvePaymentIdentity } from "../src/commands/request.js";
 import { handleCompatCommand } from "../src/compat.js";
-import { loadWalletState, saveWalletState } from "../src/wallet/store.js";
+import { emptyWalletState, loadWalletState, saveWalletState } from "../src/wallet/store.js";
 import { useTempHome, walletState } from "./helpers.js";
 
 afterEach(() => {
   mocks.loadAccounts.mockReset();
   vi.unstubAllGlobals();
+});
+
+it("request-triggered authorization selects Moderato despite the persisted mainnet default", async () => {
+  await useTempHome();
+  await saveWalletState(emptyWalletState());
+  vi.stubEnv("TEMPO_PRIVATE_KEY", "");
+  mocks.loadAccounts.mockRejectedValue(new Error("Stop at device authorization"));
+  try {
+    await expect(
+      resolvePaymentIdentity(parseRequestArgs(["-n", "testnet", "https://example.com"])),
+    ).rejects.toThrow("Stop at device authorization");
+    await Storage.filesystem().getItem("store");
+    expect((await loadWalletState()).chainId).toBe(42431);
+    expect(mocks.loadAccounts).toHaveBeenCalledOnce();
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });
 
 it.each([
