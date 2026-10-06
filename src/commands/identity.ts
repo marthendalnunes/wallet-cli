@@ -36,7 +36,7 @@ import {
   localAccessKeyStatus,
   selectPaymentCapableAccessKey,
 } from "../wallet/access-key.js";
-import { queryCreditBalance } from "./credits.js";
+import { queryMachBalance, warnCreditsAlias } from "../shared/mach.js";
 
 export async function loginHandler(options: {
   network?: string | undefined;
@@ -97,21 +97,20 @@ export async function logoutHandler() {
 export async function whoamiHandler(options: {
   network?: string | undefined;
   credits?: boolean | undefined;
+  mach?: boolean | undefined;
 }) {
   const state = await loadWalletState();
   const activeAccount = state.accounts[state.activeAccount ?? 0];
   const walletAddress = activeAccount?.address ?? null;
   const chain = chainId(options.network);
 
-  if (options.credits && !walletAddress)
-    throw usageError("Configuration missing: No wallet configured. Run 'tempo wallet login'.");
-
-  const credits =
-    options.credits && walletAddress
-      ? await queryCreditBalance({ chainId: chain, walletAddress })
-      : null;
-
-  if (options.credits) return { credits };
+  if (options.credits) warnCreditsAlias();
+  const mach = options.mach || options.credits;
+  if (mach) {
+    if (!walletAddress)
+      throw usageError("Configuration missing: No wallet configured. Run 'tempo wallet login'.");
+    return { mach: await queryMachBalance({ chainId: chain, walletAddress }) };
+  }
 
   return await currentWhoamiOutput({
     walletAddress,
